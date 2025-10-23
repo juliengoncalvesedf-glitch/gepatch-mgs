@@ -12,42 +12,65 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # 👉 Utilise l'image "pspdev" (avec outils de build) plutôt que "psptoolchain"
+    # Toolchain PSP complet
     container:
       image: ghcr.io/pspdev/pspdev:latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repo (GePatch modifié)
         uses: actions/checkout@v4
 
-      # IMPORTANT: /bin/sh (pas bash)
-      - name: Show env
+      - name: Fetch ARK-4 (SystemCtrlForKernel)
         shell: sh
         run: |
           set -e
-          echo "Shell: $SHELL"
-          echo "PATH=$PATH"
+          git clone --depth 1 https://github.com/PSP-Archive/ARK-4.git
+          # Build la lib SystemCtrlForKernel (stubs + headers PRO/ARK)
+          make -C ARK-4/libs/SystemCtrlForKernel
+          ls -l ARK-4/libs/SystemCtrlForKernel
+
+      - name: Show toolchain
+        shell: sh
+        run: |
+          set -e
           which make || true
           which psp-gcc || true
           psp-gcc --version || true
-          echo "Repo tree:"; ls -la
+          echo "Tree:"
+          ls -la
 
-      - name: Build GePatch (PRX)
+      - name: Build GePatch (PRX) avec SystemCtrl
         shell: sh
+        env:
+          ARKROOT: ${{ github.workspace }}/ARK-4
         run: |
           set -e
-          # ➜ Ton Makefile est à la racine du repo (d'après ton log)
-          if [ -f Makefile ]; then
-            echo "Using Makefile in $(pwd)"
-          else
-            echo "Makefile introuvable. Contenu:"; ls -la; exit 1
-          fi
+          # Ton Makefile est à la racine (d'après ton log)
+          test -f Makefile || { echo "Makefile introuvable"; ls -la; exit 1; }
 
+          # Variables d'include et de link vers SystemCtrlForKernel
+          INC_SYSCTRL="$ARKROOT/libs/SystemCtrlForKernel/include"
+          LIB_SYSCTRL="$ARKROOT/libs/SystemCtrlForKernel"
+
+          echo "Using headers: $INC_SYSCTRL"
+          echo "Using libdir : $LIB_SYSCTRL"
+
+          # Nettoyage
           make clean || true
-          make
+
+          # Build avec options kernel + ajout des include/lib pour SystemCtrl
+          make \
+            BUILD_PRX=1 \
+            USE_KERNEL_LIBS=1 \
+            USE_KERNEL_LIBC=1 \
+            CFLAGS="$CFLAGS -I$INC_SYSCTRL" \
+            CPPFLAGS="$CPPFLAGS -I$INC_SYSCTRL" \
+            LDFLAGS="$LDFLAGS -L$LIB_SYSCTRL" \
+            LIBS="$LIBS -lpspsystemctrl_kernel"
 
           echo "Fichiers générés :"
           ls -l || true
+          find . -maxdepth 2 -type f -name "ge_patch.prx" -print
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
