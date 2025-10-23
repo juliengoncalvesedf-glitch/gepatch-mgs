@@ -1,0 +1,24 @@
+name: build-prx
+on:
+  workflow_dispatch:
+  push:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: pspdev/psptoolchain:latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build GePatch (PRX)
+        run: |
+          set -e
+          cd GePatch-0.2/GePatch-0.2
+          make clean || true
+          make
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ge_patch_build
+          path: |
+            GePatch-0.2/GePatch-0.2/ge_patch.prx
+            GePatch-0.2/GePatch-0.2/*.elf
+            GePatch-0.2/GePatch-0.2/*.map
