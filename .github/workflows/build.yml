@@ -12,7 +12,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    # Toolchain PSP complet avec make + psp-gcc
     container:
       image: ghcr.io/pspdev/pspdev:latest
 
@@ -26,7 +25,7 @@ jobs:
           set -e
           git clone --depth 1 https://github.com/PSP-Archive/ARK-4.git
 
-      - name: Build SystemCtrlForKernel (with ARKROOT)
+      - name: Build SystemCtrlForKernel (export ARKROOT)
         shell: sh
         run: |
           set -e
@@ -35,35 +34,42 @@ jobs:
           make -C "$ARKROOT/libs/SystemCtrlForKernel"
           ls -l "$ARKROOT/libs/SystemCtrlForKernel"
 
-      - name: Show toolchain
-        shell: sh
-        run: |
-          set -e
-          which make || true
-          which psp-gcc || true
-          psp-gcc --version || true
-          echo "Repo tree:"; ls -la
-
-      - name: Build GePatch (PRX) linking SystemCtrl
+      - name: Build GePatch (PRX) linking SystemCtrl + PSPSDK includes
         shell: sh
         env:
           ARKROOT: ${{ github.workspace }}/ARK-4
         run: |
           set -e
+
+          # Récupère la racine du toolchain PSP (PSPDEV) depuis le conteneur
+          export PSPDEV="$(psp-config --psp-prefix)"
+          export PATH="$PATH:$PSPDEV/bin"
+          echo "PSPDEV=$PSPDEV"
+          test -n "$PSPDEV" || { echo "PSPDEV introuvable"; exit 1; }
+
           test -f Makefile || { echo "Makefile introuvable"; ls -la; exit 1; }
 
           INC_SYSCTRL="$ARKROOT/libs/SystemCtrlForKernel/include"
           LIB_SYSCTRL="$ARKROOT/libs/SystemCtrlForKernel"
-          echo "Using headers: $INC_SYSCTRL"
+
+          # Includes PSPSDK
+          INC_PSPSDK_1="$PSPDEV/psp/include"
+          INC_PSPSDK_2="$PSPDEV/psp/sdk/include"
+
+          echo "Using headers:"
+          echo "  $INC_PSPSDK_1"
+          echo "  $INC_PSPSDK_2"
+          echo "  $INC_SYSCTRL"
           echo "Using libdir : $LIB_SYSCTRL"
 
           make clean || true
+
           make \
             BUILD_PRX=1 \
             USE_KERNEL_LIBS=1 \
             USE_KERNEL_LIBC=1 \
-            CFLAGS="$CFLAGS -I$INC_SYSCTRL" \
-            CPPFLAGS="$CPPFLAGS -I$INC_SYSCTRL" \
+            CFLAGS="$CFLAGS -I$INC_PSPSDK_1 -I$INC_PSPSDK_2 -I$INC_SYSCTRL" \
+            CPPFLAGS="$CPPFLAGS -I$INC_PSPSDK_1 -I$INC_PSPSDK_2 -I$INC_SYSCTRL" \
             LDFLAGS="$LDFLAGS -L$LIB_SYSCTRL" \
             LIBS="$LIBS -lpspsystemctrl_kernel"
 
