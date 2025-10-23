@@ -41,43 +41,49 @@ jobs:
         run: |
           set -e
 
-          # Récupère PSPDEV et prépare les includes PSPSDK corrects
-          export PSPDEV="$(psp-config --psp-prefix)"
+          # ⚙️ On force PSPDEV sans /psp pour éviter le double 'psp' dans le Makefile
+          PSPROOT="$(psp-config --pspdev-path)"     # ex: /usr/local/pspdev
+          export PSPDEV="$PSPROOT"                  # => $(PSPDEV)/psp/sdk -> /usr/local/pspdev/psp/sdk
           export PATH="$PATH:$PSPDEV/bin"
-          echo "PSPDEV=$PSPDEV"
+          PSPSDK_DIR="$PSPDEV/psp/sdk"
 
+          echo "PSPDEV=$PSPDEV"
+          echo "PSPSDK_DIR=$PSPSDK_DIR"
           test -f Makefile || { echo "Makefile introuvable"; ls -la; exit 1; }
 
-          INC_SYSCTRL="$ARKROOT/libs/SystemCtrlForKernel/include"
+          # 📁 ARK headers/libs
+          INC_SYSCTRL_1="$ARKROOT/common/include"                       # <-- contient systemctrl.h
+          INC_SYSCTRL_2="$ARKROOT/libs/SystemCtrlForKernel/include"
           LIB_SYSCTRL="$ARKROOT/libs/SystemCtrlForKernel"
 
-          # Chemins PSPSDK corrects (⚠️ pas de 'psp' en double)
-          INC_PSPSDK_1="$PSPDEV/include"
-          INC_PSPSDK_2="$PSPDEV/sdk/include"
-          PSPSDK_DIR="$PSPDEV/sdk"   # pour build_prx.mak
+          # 📁 PSPSDK headers
+          INC_PSPSDK_1="$PSPDEV/psp/include"
+          INC_PSPSDK_2="$PSPDEV/psp/sdk/include"
 
           echo "Using headers:"
           echo "  $INC_PSPSDK_1"
           echo "  $INC_PSPSDK_2"
-          echo "  $INC_SYSCTRL"
+          echo "  $INC_SYSCTRL_1"
+          echo "  $INC_SYSCTRL_2"
           echo "Using PSPSDK (for build_prx.mak): $PSPSDK_DIR"
           echo "Using libdir : $LIB_SYSCTRL"
 
           make clean || true
 
-          # On force PSPSDK pour que le Makefile inclue $PSPSDK/lib/build_prx.mak au bon endroit
+          # ✅ On force PSPSDK pour que l'include $(PSPSDK)/lib/build_prx.mak marche
           make \
             PSPSDK="$PSPSDK_DIR" \
             BUILD_PRX=1 \
             USE_KERNEL_LIBS=1 \
             USE_KERNEL_LIBC=1 \
-            CFLAGS="$CFLAGS -I$INC_PSPSDK_1 -I$INC_PSPSDK_2 -I$INC_SYSCTRL" \
-            CPPFLAGS="$CPPFLAGS -I$INC_PSPSDK_1 -I$INC_PSPSDK_2 -I$INC_SYSCTRL" \
+            CFLAGS="$CFLAGS -I$INC_PSPSDK_1 -I$INC_PSPSDK_2 -I$INC_SYSCTRL_1 -I$INC_SYSCTRL_2" \
+            CPPFLAGS="$CPPFLAGS -I$INC_PSPSDK_1 -I$INC_PSPSDK_2 -I$INC_SYSCTRL_1 -I$INC_SYSCTRL_2" \
             LDFLAGS="$LDFLAGS -L$LIB_SYSCTRL" \
             LIBS="$LIBS -lpspsystemctrl_kernel"
 
           echo "Fichiers générés :"
           find . -maxdepth 2 -type f \( -name "ge_patch.prx" -o -name "*.elf" -o -name "*.map" \) -print
+
           
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
