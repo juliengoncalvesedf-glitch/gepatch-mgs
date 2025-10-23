@@ -12,6 +12,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
+    # Toolchain PSP complet (gcc/make) depuis GHCR
     container:
       image: ghcr.io/pspdev/pspdev:latest
 
@@ -24,53 +25,47 @@ jobs:
         run: |
           set -e
           git clone --depth 1 https://github.com/PSP-Archive/ARK-4.git
-
-      - name: Build SystemCtrlForKernel (export ARKROOT)
-        shell: sh
-        run: |
-          set -e
           export ARKROOT="$GITHUB_WORKSPACE/ARK-4"
-          echo "ARKROOT=$ARKROOT"
+          # Build SystemCtrlForKernel (stubs + lib kernel)
           make -C "$ARKROOT/libs/SystemCtrlForKernel"
-          ls -l "$ARKROOT/libs/SystemCtrlForKernel"
+          ls -l "$ARKROOT/libs/SystemCtrlForKernel" || true
+          ls -l "$ARKROOT/common/include" || true
 
-      - name: Build GePatch (PRX) linking SystemCtrl + PSPSDK includes
+      - name: Build GePatch (PRX)
         shell: sh
         env:
           ARKROOT: ${{ github.workspace }}/ARK-4
         run: |
           set -e
 
-          # ⚙️ On force PSPDEV sans /psp pour éviter le double 'psp' dans le Makefile
+          # ⚙️ Récupère les chemins PSPDEV/PSPSDK corrects dans ce conteneur
           PSPROOT="$(psp-config --pspdev-path)"     # ex: /usr/local/pspdev
-          export PSPDEV="$PSPROOT"                  # => $(PSPDEV)/psp/sdk -> /usr/local/pspdev/psp/sdk
+          export PSPDEV="$PSPROOT"                  # Makefiles attendent $(PSPDEV)/psp/...
           export PATH="$PATH:$PSPDEV/bin"
           PSPSDK_DIR="$PSPDEV/psp/sdk"
 
           echo "PSPDEV=$PSPDEV"
           echo "PSPSDK_DIR=$PSPSDK_DIR"
-          test -f Makefile || { echo "Makefile introuvable"; ls -la; exit 1; }
 
-          # 📁 ARK headers/libs
-          INC_SYSCTRL_1="$ARKROOT/common/include"                       # <-- contient systemctrl.h
-          INC_SYSCTRL_2="$ARKROOT/libs/SystemCtrlForKernel/include"
-          LIB_SYSCTRL="$ARKROOT/libs/SystemCtrlForKernel"
-
-          # 📁 PSPSDK headers
+          # Includes PSPSDK
           INC_PSPSDK_1="$PSPDEV/psp/include"
           INC_PSPSDK_2="$PSPDEV/psp/sdk/include"
+
+          # Includes + lib pour SystemCtrl (ARK)
+          INC_SYSCTRL_1="$ARKROOT/common/include"                       # contient systemctrl.h
+          INC_SYSCTRL_2="$ARKROOT/libs/SystemCtrlForKernel/include"
+          LIB_SYSCTRL="$ARKROOT/libs/SystemCtrlForKernel"
 
           echo "Using headers:"
           echo "  $INC_PSPSDK_1"
           echo "  $INC_PSPSDK_2"
           echo "  $INC_SYSCTRL_1"
           echo "  $INC_SYSCTRL_2"
-          echo "Using PSPSDK (for build_prx.mak): $PSPSDK_DIR"
           echo "Using libdir : $LIB_SYSCTRL"
 
-          make clean || true
+          test -f Makefile || { echo "Makefile introuvable"; ls -la; exit 1; }
 
-          # ✅ On force PSPSDK pour que l'include $(PSPSDK)/lib/build_prx.mak marche
+          make clean || true
           make \
             PSPSDK="$PSPSDK_DIR" \
             BUILD_PRX=1 \
@@ -82,9 +77,8 @@ jobs:
             LIBS="$LIBS -lpspsystemctrl_kernel"
 
           echo "Fichiers générés :"
-          find . -maxdepth 2 -type f \( -name "ge_patch.prx" -o -name "*.elf" -o -name "*.map" \) -print
+          find . -maxdepth 3 -type f \( -name "ge_patch.prx" -o -name "*.elf" -o -name "*.map" \) -print
 
-          
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
