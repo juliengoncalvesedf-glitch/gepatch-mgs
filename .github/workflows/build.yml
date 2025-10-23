@@ -6,13 +6,13 @@ on:
 
 permissions:
   contents: read
-  packages: read   # <- nécessaire pour tirer l'image depuis ghcr.io
+  packages: read
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
-    # Utiliser l'image du toolchain PSP hébergée sur GHCR
+    # Image du toolchain PSP (hébergée sur GHCR)
     container:
       image: ghcr.io/pspdev/psptoolchain:latest
 
@@ -20,25 +20,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # IMPORTANT: utiliser /bin/sh (pas bash)
       - name: Build GePatch (PRX)
-        shell: bash
+        shell: sh
         run: |
           set -e
-          # Adapte ce chemin si ton Makefile est ailleurs :
+          echo "PWD = $(pwd)"
+          echo "Contenu racine:"
+          ls -la
+
+          # 👉 ADAPTE le chemin si besoin (où se trouve ton Makefile)
           if [ -d GePatch-0.2/GePatch-0.2 ]; then
             cd GePatch-0.2/GePatch-0.2
           elif [ -f Makefile ]; then
-            : # on est déjà au bon endroit
+            :
           else
-            echo "Makefile introuvable. Vérifie l'arborescence." >&2
-            ls -la
+            echo "Makefile introuvable; arborescence:" >&2
+            find . -maxdepth 3 -type f -name Makefile -print
             exit 1
           fi
 
+          echo "Dossier build = $(pwd)"
+          ls -la
+
           make clean || true
           make
-          echo "Contenu du dossier de build :"
-          ls -l
+
+          echo "Fichiers générés :"
+          ls -l || true
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
