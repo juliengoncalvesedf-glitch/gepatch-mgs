@@ -10,6 +10,11 @@
 
 #include "ge_constants.h"
 
+// Compat ARK/PRO : remapper FindProc vers sctrlHENFindFunction si non défini
+#ifndef FindProc
+#define FindProc sctrlHENFindFunction
+#endif
+
 PSP_MODULE_INFO("GePatch", 0x1007, 1, 0);
 
 #define DRAW_NATIVE 0xABCDEF00
@@ -815,14 +820,14 @@ int module_start(SceSize args, void *argp) {
   _sceGeListEnQueue = (void *)FindProc("sceGE_Manager", "sceGe_driver", 0xAB49E76A);
   _sceGeListEnQueueHead = (void *)FindProc("sceGE_Manager", "sceGe_driver", 0x1C0D95A6);
 
-  sctrlHENPatchSyscall((u32)_sceGeEdramGetAddr, sceGeEdramGetAddrPatched);
-  sctrlHENPatchSyscall((u32)_sceGeEdramGetSize, sceGeEdramGetSizePatched);
-  sctrlHENPatchSyscall((u32)_sceGeListUpdateStallAddr, sceGeListUpdateStallAddrPatched);
-  sctrlHENPatchSyscall((u32)_sceGeListEnQueue, sceGeListEnQueuePatched);
-  sctrlHENPatchSyscall((u32)_sceGeListEnQueueHead, sceGeListEnQueueHeadPatched);
+  sctrlHENPatchSyscall(_sceGeEdramGetAddr, sceGeEdramGetAddrPatched);
+  sctrlHENPatchSyscall(_sceGeEdramGetSize, sceGeEdramGetSizePatched);
+  sctrlHENPatchSyscall(_sceGeListUpdateStallAddr, sceGeListUpdateStallAddrPatched);
+  sctrlHENPatchSyscall(_sceGeListEnQueue, sceGeListEnQueuePatched);
+  sctrlHENPatchSyscall(_sceGeListEnQueueHead, sceGeListEnQueueHeadPatched);
 
   _sceDisplaySetFrameBuf = (void *)FindProc("sceDisplay_Service", "sceDisplay_driver", 0x289D82FE);
-  sctrlHENPatchSyscall((u32)_sceDisplaySetFrameBuf, sceDisplaySetFrameBufPatched);
+  sctrlHENPatchSyscall(_sceDisplaySetFrameBuf, sceDisplaySetFrameBufPatched);
 
   sceKernelDcacheWritebackInvalidateAll();
   sceKernelIcacheClearAll();
