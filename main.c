@@ -1,5 +1,6 @@
 #include <pspsdk.h>
 #include <pspkernel.h>
+#include <pspctrl.h>
 #include <pspge.h>
 #include <pspgu.h>
 
@@ -9,11 +10,6 @@
 #include <systemctrl.h>
 
 #include "ge_constants.h"
-
-// Compat ARK/PRO : remapper FindProc vers sctrlHENFindFunction si non défini
-#ifndef FindProc
-#define FindProc sctrlHENFindFunction
-#endif
 
 PSP_MODULE_INFO("GePatch", 0x1007, 1, 0);
 
@@ -813,6 +809,11 @@ int sceDisplaySetFrameBufPatched(void *topaddr, int bufferwidth, int pixelformat
 }
 
 int module_start(SceSize args, void *argp) {
+  SceCtrlData pad;
+  sceCtrlPeekBufferPositive(&pad, 1);
+  if (pad.Buttons & PSP_CTRL_LTRIGGER)
+    return 0;
+
   _sceGeEdramGetAddr = (void *)FindProc("sceGE_Manager", "sceGe_driver", 0xE47E40E4);
   _sceGeEdramGetSize = (void *)FindProc("sceGE_Manager", "sceGe_driver", 0x1F6752AD);
   _sceGeGetList = (void *)FindProc("sceGE_Manager", "sceGe_driver", 0x67B01D8E);
@@ -820,14 +821,14 @@ int module_start(SceSize args, void *argp) {
   _sceGeListEnQueue = (void *)FindProc("sceGE_Manager", "sceGe_driver", 0xAB49E76A);
   _sceGeListEnQueueHead = (void *)FindProc("sceGE_Manager", "sceGe_driver", 0x1C0D95A6);
 
-  sctrlHENPatchSyscall(_sceGeEdramGetAddr, sceGeEdramGetAddrPatched);
-  sctrlHENPatchSyscall(_sceGeEdramGetSize, sceGeEdramGetSizePatched);
-  sctrlHENPatchSyscall(_sceGeListUpdateStallAddr, sceGeListUpdateStallAddrPatched);
-  sctrlHENPatchSyscall(_sceGeListEnQueue, sceGeListEnQueuePatched);
-  sctrlHENPatchSyscall(_sceGeListEnQueueHead, sceGeListEnQueueHeadPatched);
+  sctrlHENPatchSyscall((u32)_sceGeEdramGetAddr, sceGeEdramGetAddrPatched);
+  sctrlHENPatchSyscall((u32)_sceGeEdramGetSize, sceGeEdramGetSizePatched);
+  sctrlHENPatchSyscall((u32)_sceGeListUpdateStallAddr, sceGeListUpdateStallAddrPatched);
+  sctrlHENPatchSyscall((u32)_sceGeListEnQueue, sceGeListEnQueuePatched);
+  sctrlHENPatchSyscall((u32)_sceGeListEnQueueHead, sceGeListEnQueueHeadPatched);
 
   _sceDisplaySetFrameBuf = (void *)FindProc("sceDisplay_Service", "sceDisplay_driver", 0x289D82FE);
-  sctrlHENPatchSyscall(_sceDisplaySetFrameBuf, sceDisplaySetFrameBufPatched);
+  sctrlHENPatchSyscall((u32)_sceDisplaySetFrameBuf, sceDisplaySetFrameBufPatched);
 
   sceKernelDcacheWritebackInvalidateAll();
   sceKernelIcacheClearAll();
