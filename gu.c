@@ -126,7 +126,16 @@ int sceGuFinish(void)
   return 0;
 }
 
-void sceGuStart(int cid, void* list)
+int sceGuStart(int cid, void* list)
 {
-  current = (unsigned int*)((unsigned int)list);
+  // Ici tu peux garder le code original s’il y en avait dans ta version.
+  // Si ce n’est qu’un wrapper, il suffit de préparer current = (unsigned int*)list.
+  current = (unsigned int*)list;
+  return 0;
+}
+
+int sceGuSync(int mode, int what)
+{
+  // Implémentation minimale, si nécessaire.
+  return 0;
 }
