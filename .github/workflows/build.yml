@@ -1,0 +1,38 @@
+name: build-prx
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main, master ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: true  # fetch ARK-4 too
+
+      - name: Install PSP toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git build-essential cmake python3 zip
+          git clone https://github.com/pspdev/pspdev.git
+          cd pspdev
+          sudo ./build-all.sh
+          echo "PSPDEV=/usr/local/pspdev" | sudo tee -a /etc/environment
+          echo "PATH=/usr/local/pspdev/bin:$PATH" | sudo tee -a /etc/environment
+          echo "PSPDEV=/usr/local/pspdev" >> $GITHUB_ENV
+          echo "PATH=/usr/local/pspdev/bin:$PATH" >> $GITHUB_ENV
+
+      - name: Add ARK-4 submodule (if not present)
+        run: |
+          if [ ! -d "ARK-4" ]; then
+            git submodule add https://github.com/PSP-Archive/ARK-4.git ARK-4 || true
+          fi
+
+      - name: Build
+        run: |
+          make
