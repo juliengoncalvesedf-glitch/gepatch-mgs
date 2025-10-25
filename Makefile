@@ -1,20 +1,16 @@
-all:
-	cp $(TARGET).prx E:/pspemu/seplugins/$(TARGET).prx
-
 TARGET = ge_patch
 OBJS = main.o gu.o exports.o
-
-CFLAGS = -O3 -Os -G0 -Wall -fshort-wchar -fno-pic -mno-check-zero-division
-CXXFLAGS = $(CFLAGS) -fno-exceptions -fno-rtti
-ASFLAGS = $(CFLAGS)
 
 BUILD_PRX = 1
 PRX_EXPORTS = exports.exp
 
-USE_KERNEL_LIBC = 1
-USE_KERNEL_LIBS = 1
+CFLAGS = -O2 -G0 -Wall \
+  -I./ARK-4/common/include \
+  -I./ARK-4/libs/SystemCtrlForKernel/include
 
-LIBS = -lpspsystemctrl_kernel
+LIBDIR = -L./ARK-4/libs/SystemCtrlForKernel
+LIBS = -lpspgu -lpspdisplay -lpspge -lpspctrl -lpspsystemctrl_kernel
+LDFLAGS =
 
-PSPSDK = $(shell psp-config --pspsdk-path)
+PSPSDK ?= /usr/local/pspdev/psp/sdk
 include $(PSPSDK)/lib/build_prx.mak
