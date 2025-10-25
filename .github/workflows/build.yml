@@ -15,21 +15,26 @@ jobs:
         with:
           submodules: true  # fetch ARK-4 too
 
-      - name: Install PSP toolchain
+      - name: Install OS dependencies (Ubuntu 24.04)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             git build-essential cmake python3 zip \
-            gpgme-tools libarchive-tools libcurl4-openssl-dev
+            pkgconf libreadline8 libusb-0.1-4 \
+            libgpgme11t64 libgpgme-dev \
+            libarchive-tools fakeroot curl ca-certificates
 
+      - name: Install PSP toolchain
+        run: |
           git clone https://github.com/pspdev/pspdev.git
           cd pspdev
-          sudo ./build-all.sh
-
-          echo "PSPDEV=/usr/local/pspdev" | sudo tee -a /etc/environment
-          echo "PATH=/usr/local/pspdev/bin:$PATH" | sudo tee -a /etc/environment
+          # méthode canonique documentée
+          ./bootstrap.sh
+          ./depends/check-dependencies.sh
+          ./toolchain.sh
+          # exposer PSPDEV/PSP binaires à la suite des jobs
           echo "PSPDEV=/usr/local/pspdev" >> $GITHUB_ENV
-          echo "PATH=/usr/local/pspdev/bin:$PATH" >> $GITHUB_ENV
+          echo "/usr/local/pspdev/bin" >> $GITHUB_PATH
 
       - name: Add ARK-4 submodule (if not present)
         run: |
@@ -40,3 +45,10 @@ jobs:
       - name: Build
         run: |
           make
+
+      - name: Upload PRX artifact
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ge_patch.prx
+          path: ge_patch.prx
