@@ -9,30 +9,35 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          submodules: true  # fetch ARK-4 too
+          submodules: true  # récupère ARK-4 si présent
 
       - name: Install OS dependencies (Ubuntu 24.04)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            git build-essential cmake python3 zip \
-            pkgconf libreadline8 libusb-0.1-4 \
-            libgpgme11t64 libgpgme-dev \
-            libarchive-tools fakeroot curl ca-certificates
+            git build-essential cmake python3 zip curl ca-certificates pkgconf \
+            libarchive-tools fakeroot \
+            libreadline8 libreadline-dev \
+            libusb-0.1-4 libusb-dev \
+            libgpgme11t64 libgpgme-dev
 
-      - name: Install PSP toolchain
+      - name: Build & install PSP toolchain (pspdev)
         run: |
           git clone https://github.com/pspdev/pspdev.git
           cd pspdev
-          # méthode canonique documentée
-          ./bootstrap.sh
-          ./depends/check-dependencies.sh
-          ./toolchain.sh
-          # exposer PSPDEV/PSP binaires à la suite des jobs
+          # Prépare l’emplacement d’installation
+          sudo mkdir -p /usr/local/pspdev
+          sudo chown "$USER":"$USER" /usr/local/pspdev
+          export PSPDEV=/usr/local/pspdev
+          export PATH="$PSPDEV/bin:$PATH"
+          # Script officiel unique
+          ./build-all.sh
+          # Rendre le PSPDEV dispo pour les étapes suivantes
           echo "PSPDEV=/usr/local/pspdev" >> $GITHUB_ENV
           echo "/usr/local/pspdev/bin" >> $GITHUB_PATH
 
@@ -42,7 +47,7 @@ jobs:
             git submodule add https://github.com/PSP-Archive/ARK-4.git ARK-4 || true
           fi
 
-      - name: Build
+      - name: Build PRX
         run: |
           make
 
