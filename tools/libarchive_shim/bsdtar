@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""Minimal bsdtar replacement used for offline toolchains.
+
+This shim only implements the subset of the bsdtar interface that is used
+by the PSPDEV dependency bootstrap scripts.  It understands the following
+flags:
+
+  * -x / --extract   Extract archives (the default behaviour).
+  * -f <archive>     Select the archive to operate on.
+  * -C <path>        Change to a given directory before extracting.
+  * -v               Verbose output (optional).
+
+Any additional flags are ignored instead of causing a hard failure.  The
+implementation relies on Python's ``tarfile`` module which supports gzip,
+zip, xz and bzip2 compressed tarballs out of the box.
+
+This is intentionally tiny – it provides just enough features to get the
+PSP toolchain sources unpacked without pulling in the full libarchive
+runtime, which is not available inside the GitHub Actions sandbox.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+import tarfile
+from pathlib import Path
+from typing import Iterable, Iterator, Optional
+
+
+class ArgumentParser:
+    """Very small flag parser tailored for the bsdtar CLI."""
+
+    def __init__(self, argv: Iterable[str]):
+        self._args = list(argv)
+        self.archive: Optional[str] = None
+        self.directory: Path = Path.cwd()
+        self.members: list[str] = []
+        self.verbose: bool = False
+
+    def parse(self) -> None:
+        args = self._args
+        idx = 0
+        while idx < len(args):
+            arg = args[idx]
+            if arg in ("-x", "--extract"):
+                pass  # Extraction is the default behaviour.
+            elif arg == "-f":
+                idx += 1
+                if idx >= len(args):
+                    raise SystemExit("bsdtar: option '-f' requires an argument")
+                self.archive = args[idx]
+            elif arg.startswith("-f") and arg != "-f":
+                self.archive = arg[2:]
+            elif arg == "-C":
+                idx += 1
+                if idx >= len(args):
+                    raise SystemExit("bsdtar: option '-C' requires an argument")
+                self.directory = Path(args[idx]).expanduser().resolve()
+            elif arg.startswith("-C") and arg != "-C":
+                self.directory = Path(arg[2:]).expanduser().resolve()
+            elif arg == "-v":
+                self.verbose = True
+            elif arg.startswith("-"):
+                # Ignore unsupported flags so that we behave similarly to the
+                # real bsdtar, which accepts a large number of options.
+                pass
+            else:
+                self.members.append(arg)
+            idx += 1
+
+        if self.archive is None:
+            raise SystemExit("bsdtar: missing archive filename (use -f)")
+
+
+def iter_members(tf: tarfile.TarFile, members: list[str]) -> Iterator[tarfile.TarInfo]:
+    if not members:
+        yield from tf
+        return
+
+    selected = set(members)
+    for info in tf:
+        if info.name in selected:
+            yield info
+
+
+def main(argv: list[str]) -> int:
+    parser = ArgumentParser(argv[1:])
+    try:
+        parser.parse()
+    except SystemExit as exc:  # pragma: no cover - mirrors real utility output
+        print(exc, file=sys.stderr)
+        return 1
+
+    archive_path = Path(parser.archive).expanduser()
+    if not archive_path.exists():
+        print(f"bsdtar: Error opening archive: '{archive_path}'", file=sys.stderr)
+        return 1
+
+    try:
+        parser.directory.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        print(f"bsdtar: Failed to prepare directory '{parser.directory}': {exc}", file=sys.stderr)
+        return 1
+
+    try:
+        with tarfile.open(archive_path) as tf:
+            members = list(iter_members(tf, parser.members))
+            tf.extractall(path=parser.directory, members=members)
+            if parser.verbose:
+                for info in members:
+                    print(info.name)
+    except tarfile.TarError as exc:
+        print(f"bsdtar: {exc}", file=sys.stderr)
+        return 1
+
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv))
