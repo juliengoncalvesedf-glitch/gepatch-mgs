@@ -1,0 +1,10 @@
+prefix=${pcfiledir}/../..
+exec_prefix=${prefix}
+libdir=${exec_prefix}/lib
+includedir=${prefix}/include
+
+Name: libarchive-shim
+Description: Minimal shim that satisfies PSPDEV dependency checks
+Version: 0.0.1
+Libs:
+Cflags:
