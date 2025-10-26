@@ -1,0 +1,66 @@
+name: setup-libarchive-shim
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+# Permissions minimales
+permissions:
+  contents: read
+
+# Évite d'exécuter 2 runs en parallèle sur la même ref
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  run-setup:
+    name: make setup-libarchive-shim (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # mets "recursive" si tu utilises des submodules
+          submodules: false
+
+      # --- Dépendances système libarchive ---
+      - name: Install libarchive (Ubuntu)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential pkg-config libarchive-dev
+
+      - name: Install libarchive (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          brew update
+          brew install libarchive
+
+      # (Optionnel) Cache d'un dossier de build local si ton target le crée
+      # - name: Cache deps
+      #   uses: actions/cache@v4
+      #   with:
+      #     path: |
+      #       deps/
+      #       .cache/
+      #     key: ${{ runner.os }}-deps-${{ hashFiles('**/Makefile') }}
+      #     restore-keys: |
+      #       ${{ runner.os }}-deps-
+
+      - name: Run make setup-libarchive-shim
+        run: make setup-libarchive-shim
+
+      # (Optionnel) Publier des artefacts si ton target produit des fichiers
+      # - name: Upload artifact
+      #   if: always()
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: libarchive-shim-${{ matrix.os }}
+      #     path: build/**/*
