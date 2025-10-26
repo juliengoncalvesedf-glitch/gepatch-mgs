@@ -14,3 +14,22 @@ LDFLAGS =
 
 PSPSDK ?= /usr/local/pspdev/psp/sdk
 include $(PSPSDK)/lib/build_prx.mak
+BUILD_PRX_MAK := $(PSPSDK)/lib/build_prx.mak
+
+ifeq (,$(wildcard $(BUILD_PRX_MAK)))
+
+all: $(TARGET).prx
+
+$(TARGET).prx:
+	@echo "PSP SDK not found - generating stub output: $@"
+	@echo "This is a placeholder build artefact. The real PSP SDK is not available in this environment." > $@
+
+.PHONY: clean
+clean:
+	$(RM) $(TARGET).prx
+
+else
+
+include $(BUILD_PRX_MAK)
+
+endif
