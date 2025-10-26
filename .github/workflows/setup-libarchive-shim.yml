@@ -5,62 +5,41 @@ on:
   pull_request:
   workflow_dispatch:
 
-# Permissions minimales
 permissions:
   contents: read
 
-# Évite d'exécuter 2 runs en parallèle sur la même ref
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   run-setup:
-    name: make setup-libarchive-shim (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+    name: make setup-libarchive-shim (pspdev container)
+    runs-on: ubuntu-latest
+
+    # Utilise une image qui contient déjà le PSP SDK dans /usr/local/pspdev
+    container:
+      image: ghcr.io/pspdev/pspdev:latest
+      # si besoin d'un shell login pour PATH/PSPDEV, on peut ajouter:
+      # options: --entrypoint /bin/bash
+
+    env:
+      PSPDEV: /usr/local/pspdev
+      PATH: /usr/local/pspdev/bin:/usr/local/pspdev/psp/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          # mets "recursive" si tu utilises des submodules
           submodules: false
 
-      # --- Dépendances système libarchive ---
-      - name: Install libarchive (Ubuntu)
-        if: matrix.os == 'ubuntu-latest'
+      # (Optionnel) Dépendances côté host/container
+      # Ajoute ce dont ton Makefile a besoin en plus du SDK PSP
+      - name: Install extra build deps
         run: |
-          sudo apt-get update
-          sudo apt-get install -y build-essential pkg-config libarchive-dev
+          apt-get update
+          apt-get install -y build-essential pkg-config libarchive-dev git ca-certificates
 
-      - name: Install libarchive (macOS)
-        if: matrix.os == 'macos-latest'
+      - name: Run make target
         run: |
-          brew update
-          brew install libarchive
-
-      # (Optionnel) Cache d'un dossier de build local si ton target le crée
-      # - name: Cache deps
-      #   uses: actions/cache@v4
-      #   with:
-      #     path: |
-      #       deps/
-      #       .cache/
-      #     key: ${{ runner.os }}-deps-${{ hashFiles('**/Makefile') }}
-      #     restore-keys: |
-      #       ${{ runner.os }}-deps-
-
-      - name: Run make setup-libarchive-shim
-        run: make setup-libarchive-shim
-
-      # (Optionnel) Publier des artefacts si ton target produit des fichiers
-      # - name: Upload artifact
-      #   if: always()
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: libarchive-shim-${{ matrix.os }}
-      #     path: build/**/*
+          make setup-libarchive-shim
